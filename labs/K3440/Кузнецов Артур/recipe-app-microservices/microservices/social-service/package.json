@@ -12,6 +12,8 @@
   "author": "Artur Kuznetsov",
   "license": "ISC",
   "dependencies": {
+    "@types/amqplib": "^0.10.8",
+    "amqplib": "^0.10.9",
     "bcrypt": "^5.1.1",
     "common-service": "file:../common-service",
     "cors": "^2.8.5",

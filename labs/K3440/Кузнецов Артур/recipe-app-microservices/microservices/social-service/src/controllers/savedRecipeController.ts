@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { SavedRecipe } from '../models/SavedRecipe';
-import { AuthRequest, recipeExists, userExists } from 'common-service';
+import { AuthRequest, recipeExists, userExists, sendMessage } from 'common-service';
 
 const savedRecipeRepository = AppDataSource.getRepository(SavedRecipe);
 
@@ -39,6 +39,18 @@ export const createSavedRecipe = async function(req: AuthRequest, res: Response)
 
     const savedRecipe = savedRecipeRepository.create({ userId, recipeId });
     const saved = await savedRecipeRepository.save(savedRecipe);
+
+    try {
+        await sendMessage({
+            event: 'savedRecipe.created',
+            savedRecipeId: saved.id,
+            userId: saved.userId,
+            recipeId: saved.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
 
     res.status(201).json(saved);
 };
@@ -133,5 +145,18 @@ export const deleteSavedRecipe = async function(req: AuthRequest, res: Response)
     }
 
     await savedRecipeRepository.delete({ id });
+    
+    try {
+        await sendMessage({
+            event: 'savedRecipe.deleted',
+            savedRecipeId: id,
+            userId: savedRecipe.userId,
+            recipeId: savedRecipe.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.status(204).send();
 };

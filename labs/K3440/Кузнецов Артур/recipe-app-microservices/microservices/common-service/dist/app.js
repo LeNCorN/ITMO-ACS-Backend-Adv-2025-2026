@@ -18,3 +18,4 @@ __exportStar(require("./middleware/authMiddleware"), exports);
 __exportStar(require("./middleware/adminOnlyMiddleware"), exports);
 __exportStar(require("./middleware/errorHandler"), exports);
 __exportStar(require("./utils/checkExistence"), exports);
+__exportStar(require("./utils/rabbitmq"), exports);

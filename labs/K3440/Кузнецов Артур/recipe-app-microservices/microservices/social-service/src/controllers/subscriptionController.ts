@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Subscription } from '../models/Subscription';
-import { AuthRequest, userExists } from 'common-service';
+import { AuthRequest, userExists, sendMessage } from 'common-service';
 
 const subscriptionRepository = AppDataSource.getRepository(Subscription);
 
@@ -50,6 +50,19 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
     });
 
     const saved = await subscriptionRepository.save(sub);
+    
+    try {
+        await sendMessage({
+            event: 'subscription.created',
+            subscriptionId: saved.id,
+            followerId: saved.followerId,
+            followingId: saved.followingId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.status(201).json(saved);
 };
 
@@ -151,5 +164,18 @@ export const deleteSubscription = async (req: AuthRequest, res: Response) => {
     }
 
     await subscriptionRepository.delete({ id });
+    
+    try {
+        await sendMessage({
+            event: 'subscription.deleted',
+            subscriptionId: id,
+            followerId: sub.followerId,
+            followingId: sub.followingId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.status(204).send();
 };

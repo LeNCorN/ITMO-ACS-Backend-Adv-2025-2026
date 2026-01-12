@@ -5,6 +5,7 @@ import hashPassword from '../utils/hashPassword';
 import checkPassword from '../utils/checkPassword';
 import jwt from 'jsonwebtoken';
 import { Role } from '../models/Role';
+import { sendMessage } from 'common-service';
 
 const userRepository = AppDataSource.getRepository(User);
 const roleRepository = AppDataSource.getRepository(Role);
@@ -77,6 +78,19 @@ export const register = async function(req: Request, res: Response) {
         process.env.JWT_SECRET,
         { expiresIn: '1h' },
     );
+
+    try {
+        await sendMessage({
+            event: 'user.registered',
+            userId: savedUser.id,
+            email: savedUser.email,
+            firstName: savedUser.first_name,
+            lastName: savedUser.last_name,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
 
     res.status(201).json({
         id: savedUser.id,

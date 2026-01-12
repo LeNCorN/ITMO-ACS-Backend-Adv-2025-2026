@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Comment } from '../models/Comment';
-import { AuthRequest, recipeExists, userExists } from 'common-service';
+import { AuthRequest, recipeExists, userExists, sendMessage } from 'common-service';
 
 const commentRepository = AppDataSource.getRepository(Comment);
 
@@ -88,6 +88,19 @@ export const createComment = async function(req: AuthRequest, res: Response) {
 
     const saved = await commentRepository.save(newComment);
 
+    try {
+        await sendMessage({
+            event: 'comment.created',
+            commentId: saved.id,
+            userId: saved.userId,
+            recipeId: saved.recipeId,
+            content: saved.content,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+
     res.status(201).json(saved);
 };
 
@@ -125,6 +138,19 @@ export const updateComment = async function(req: AuthRequest, res: Response) {
     }
 
     await commentRepository.save(comment);
+    
+    try {
+        await sendMessage({
+            event: 'comment.updated',
+            commentId: id,
+            userId: comment.userId,
+            recipeId: comment.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.json(comment);
 };
 
@@ -149,5 +175,18 @@ export const deleteComment = async function(req: AuthRequest, res: Response) {
     }
 
     await commentRepository.delete({ id });
+    
+    try {
+        await sendMessage({
+            event: 'comment.deleted',
+            commentId: id,
+            userId: comment.userId,
+            recipeId: comment.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.status(204).send();
 };

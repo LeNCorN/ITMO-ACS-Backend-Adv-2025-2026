@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Like } from '../models/Like';
-import { AuthRequest, recipeExists, userExists } from 'common-service';
+import { AuthRequest, recipeExists, userExists, sendMessage } from 'common-service';
 
 const likeRepository = AppDataSource.getRepository(Like);
 
@@ -83,6 +83,18 @@ export const createLike = async function(req: AuthRequest, res: Response) {
     const like = likeRepository.create({ userId: authorId, recipeId });
     const saved = await likeRepository.save(like);
 
+    try {
+        await sendMessage({
+            event: 'like.created',
+            likeId: saved.id,
+            userId: saved.userId,
+            recipeId: saved.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+
     res.status(201).json(saved);
 };
 
@@ -134,5 +146,18 @@ export const deleteLike = async function(req: AuthRequest, res: Response) {
     }
 
     await likeRepository.delete({ id });
+    
+    try {
+        await sendMessage({
+            event: 'like.deleted',
+            likeId: id,
+            userId: like.userId,
+            recipeId: like.recipeId,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+    
     res.status(204).send();
 };

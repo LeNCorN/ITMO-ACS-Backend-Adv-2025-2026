@@ -14,7 +14,7 @@ import { initializeIngredients } from './services/initIngredientService';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerOptions } from './swagger';
-import { errorHandler } from 'common-service';
+import { connectRabbitMQ, consumeMessages, errorHandler } from 'common-service';
 
 const app = express();
 const PORT = 3001;
@@ -47,6 +47,19 @@ AppDataSource
     await initializeDishTypes();
     await initializeRecipeDifficulties();
     await initializeIngredients();
+
+    try {
+        await connectRabbitMQ();
+        await consumeMessages((message: any) => {
+            console.log(`[Recipe Service] Event received: ${message.event}`, message);
+            if (message.event === 'user.deleted' && message.userId) {
+                console.log(`[Recipe Service] User ${message.userId} deleted - should clean up related recipes`);
+            }
+        });
+    } catch (error) {
+        console.error('Failed to connect to RabbitMQ:', error);
+        process.exit(1);
+    }
 
     app.listen(PORT, () => {
         console.log('Server is running on port: ' + PORT);

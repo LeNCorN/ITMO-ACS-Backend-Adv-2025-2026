@@ -9,7 +9,7 @@ import subscriptionRouter from './routers/subscriptionRouter';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerOptions } from './swagger';
-import { errorHandler } from 'common-service';
+import { errorHandler, connectRabbitMQ, consumeMessages } from 'common-service';
 
 const app = express();
 const PORT = 3002;
@@ -36,6 +36,22 @@ AppDataSource
 .initialize()
 .then(async () => {
     console.log('Database connected');
+
+    try {
+        await connectRabbitMQ();
+        await consumeMessages((message: any) => {
+            console.log(`[Social Service] Event received: ${message.event}`, message);
+            if (message.event === 'user.deleted' && message.userId) {
+                console.log(`[Social Service] User ${message.userId} deleted - should clean up likes, comments, subscriptions`);
+            }
+            if (message.event === 'recipe.deleted' && message.recipeId) {
+                console.log(`[Social Service] Recipe ${message.recipeId} deleted - should clean up likes, comments, saved recipes`);
+            }
+        });
+    } catch (error) {
+        console.error('Failed to connect to RabbitMQ:', error);
+        process.exit(1);
+    }
 
     app.listen(PORT, () => {
         console.log('Server is running on port: ' + PORT);

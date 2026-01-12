@@ -9,7 +9,7 @@ import { initializeRoles } from './services/initRoleService';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerOptions } from './swagger';
-import { errorHandler } from 'common-service';
+import { connectRabbitMQ, consumeMessages, errorHandler } from 'common-service';
 
 const app = express();
 const PORT = 3000;
@@ -37,6 +37,16 @@ AppDataSource
     console.log('Database connected');
 
     await initializeRoles();
+
+    try {
+        await connectRabbitMQ();
+        await consumeMessages((message: any) => {
+            console.log(`[Auth Service] Event received: ${message.event}`, message);
+        });
+    } catch (error) {
+        console.error('RabbitMQ is required. Shutting down...', error);
+        process.exit(1);
+    }
 
     app.listen(PORT, () => {
         console.log('Server is running on port: ' + PORT);

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { AppDataSource } from '../config/database';
-import { AuthRequest } from 'common-service';
+import { AuthRequest, sendMessage } from 'common-service';
 import { Role } from '../models/Role';
 import hashPassword from '../utils/hashPassword';
 
@@ -44,6 +44,19 @@ export const createUser = async function(req: Request, res: Response) {
         role: defaultRole,
     });
     const savedUser = await userRepository.save(newUser);
+
+    try {
+        await sendMessage({
+            event: 'user.created',
+            userId: savedUser.id,
+            email: savedUser.email,
+            firstName: savedUser.first_name,
+            lastName: savedUser.last_name,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
 
     res.status(201).json({
         id: savedUser.id,
@@ -147,10 +160,27 @@ export const updateUser = async function(req: Request, res: Response) {
 
 export const deleteUser = async function(req: Request, res: Response) {
     const id = Number(req.params.id);
+    const user = await userRepository.findOneBy({ id });
+    if (!user) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+    }
+    
     const result = await userRepository.delete(id);
     if (result.affected === 0) {
         res.status(404).json({ message: 'User not found' });
         return;
     }
+
+    try {
+        await sendMessage({
+            event: 'user.deleted',
+            userId: id,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Failed to send message to RabbitMQ:', error);
+    }
+
     res.status(204).send();
 };
